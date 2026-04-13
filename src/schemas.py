@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[.!?])\s+")
+
+
+def _count_sentences(text: str) -> int:
+    """Count sentences using lightweight punctuation-based splitting."""
+
+    parts = [part.strip() for part in SENTENCE_SPLIT_PATTERN.split(text.strip()) if part.strip()]
+    return len(parts)
 
 
 class Decision(str, Enum):
@@ -22,6 +32,38 @@ class StrategyOutput(BaseModel):
     decision: Decision
     confidence: int = Field(..., ge=1, le=10)
     justification: str = Field(..., min_length=1)
+
+    @field_validator("name", "justification", mode="before")
+    @classmethod
+    def strip_text_fields(cls, value: object) -> object:
+        """Strip leading and trailing whitespace from text fields."""
+
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        """Ensure the strategy name is not empty after stripping."""
+
+        if not value:
+            raise ValueError("name must be non-empty.")
+        return value
+
+    @field_validator("justification")
+    @classmethod
+    def validate_justification(cls, value: str) -> str:
+        """Ensure the justification contains 3 to 5 sentences."""
+
+        if not value:
+            raise ValueError("justification must be non-empty.")
+
+        sentence_count = _count_sentences(value)
+        if sentence_count < 3 or sentence_count > 5:
+            raise ValueError("justification must contain 3 to 5 sentences.")
+
+        return value
 
 
 class EvaluatorOutput(BaseModel):

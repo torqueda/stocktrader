@@ -42,6 +42,28 @@ def test_strategy_output_invalid_confidence() -> None:
         )
 
 
+def test_strategy_output_invalid_justification_sentence_count() -> None:
+    with pytest.raises(ValidationError):
+        StrategyOutput(
+            name="Momentum Trader",
+            decision=Decision.HOLD,
+            confidence=5,
+            justification="Only two sentences here. That should fail.",
+        )
+
+
+def test_strategy_output_strips_text_fields() -> None:
+    strategy = StrategyOutput(
+        name="  Momentum Trader  ",
+        decision=Decision.BUY,
+        confidence=7,
+        justification=" First sentence. Second sentence. Third sentence. ",
+    )
+
+    assert strategy.name == "Momentum Trader"
+    assert strategy.justification == "First sentence. Second sentence. Third sentence."
+
+
 def test_stock_analysis_output_valid() -> None:
     output = StockAnalysisOutput(
         ticker="AAPL",

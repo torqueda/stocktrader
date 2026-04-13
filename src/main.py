@@ -14,9 +14,10 @@ from .market_data import (
     build_market_data_summary,
     verify_yfinance_connection,
 )
+from .strategies import run_momentum_trader, run_value_contrarian
 
 
-def _print_json(payload: dict[str, object]) -> None:
+def _print_json(payload: object) -> None:
     """Print a JSON payload with indentation."""
 
     print(json.dumps(payload, indent=2))
@@ -60,7 +61,7 @@ def run_verification(ticker: str, include_groq: bool = True) -> int:
                 groq_error = str(exc)
                 groq_status = "FAIL"
 
-    print("Phase 2 environment verification")
+    print("Environment verification")
     print(f"yfinance check: {'PASS' if market_ready else 'FAIL'}")
     if market_summary is not None:
         _print_json(market_summary)
@@ -79,7 +80,7 @@ def run_verification(ticker: str, include_groq: bool = True) -> int:
     print(f"GROQ_API_KEY present: {'YES' if groq_key_present else 'NO'}")
 
     if market_ready and (groq_ready if include_groq else True):
-        print("Environment is ready for the next phase.")
+        print("Environment is ready for the next step.")
         return 0
 
     print("Environment is not fully ready yet. Fix the failed checks above and rerun verification.")
@@ -113,15 +114,39 @@ def run_market_data_command(ticker: str, summary_only: bool) -> int:
     return 0
 
 
+def run_strategy_command(ticker: str, use_strategy_a: bool) -> int:
+    """Build market data, run one strategy, and print the validated output."""
+
+    try:
+        market_context = build_market_context(ticker)
+        result = (
+            run_momentum_trader(ticker, market_context)
+            if use_strategy_a
+            else run_value_contrarian(ticker, market_context)
+        )
+    except Exception as exc:
+        print(f"Strategy error: {exc}", file=sys.stderr)
+        return 1
+
+    _print_json(result.model_dump(mode="json"))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the command-line parser."""
 
-    parser = argparse.ArgumentParser(description="stocktrader Phase 2 CLI")
+    parser = argparse.ArgumentParser(description="stocktrader CLI")
     command_group = parser.add_mutually_exclusive_group()
     command_group.add_argument("--verify", action="store_true", help="Run yfinance and Groq verification checks.")
     command_group.add_argument("--verify-groq", action="store_true", help="Run only the Groq smoke test.")
     command_group.add_argument("--market-data", action="store_true", help="Build the full market-data context.")
     command_group.add_argument("--market-summary", action="store_true", help="Build the compact market-data summary.")
+    command_group.add_argument("--strategy-a", action="store_true", help="Run the Momentum Trader on one ticker.")
+    command_group.add_argument(
+        "--strategy-b",
+        action="store_true",
+        help="Run the Value Contrarian on one ticker.",
+    )
     parser.add_argument("--ticker", default="AAPL", help="Ticker to use for the yfinance verification fetch.")
     return parser
 
@@ -140,6 +165,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_market_data_command(args.ticker, summary_only=False)
     if args.market_summary:
         return run_market_data_command(args.ticker, summary_only=True)
+    if args.strategy_a:
+        return run_strategy_command(args.ticker, use_strategy_a=True)
+    if args.strategy_b:
+        return run_strategy_command(args.ticker, use_strategy_a=False)
 
     parser.print_help()
     return 0

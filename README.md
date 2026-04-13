@@ -4,10 +4,14 @@
 
 ## Current Scope
 
-Phase 1 and Phase 2 are in place:
+Phase 1 through the evaluator phase are in place:
 - project scaffolding and shared contracts
 - environment verification for `yfinance` and Groq
 - a market-data component that builds compact JSON-ready context for later strategy agents
+- reusable prompt files for both strategy agents
+- single-strategy Groq calls that return validated JSON outputs
+- a reusable LLM wrapper that separates raw calls, JSON parsing, and validated structured output
+- evaluator prompt files and evaluator logic for agreement vs disagreement analysis
 
 Chosen strategies:
 - Momentum Trader
@@ -68,6 +72,26 @@ Build the compact grader-friendly market summary:
 
 The market-data component uses daily `yfinance` history, computes the Phase 2 indicators, and returns a compact JSON-serializable structure for later strategy prompts.
 
+## Strategy Commands
+
+Run the Momentum Trader on one ticker:
+
+```bash
+.venv/bin/python -m src.main --strategy-a --ticker AAPL
+```
+
+Run the Value Contrarian on one ticker:
+
+```bash
+.venv/bin/python -m src.main --strategy-b --ticker AAPL
+```
+
+These commands:
+- build the shared market context from Phase 2
+- load the saved prompt template from `prompts/`
+- call Groq for one strategy only
+- validate the returned JSON into the required strategy-output shape
+
 ## Notes for Grading
 
-Later phases will add prompt files, generated JSON outputs, and report artifacts. Pre-generated outputs will be included so the project can be reviewed without requiring graders to provide API keys.
+End-to-end orchestration and saved output artifacts are still upcoming. Later phases will add generated JSON outputs and report artifacts. Pre-generated outputs will be included so the project can be reviewed without requiring graders to provide API keys.
