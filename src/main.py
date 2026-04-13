@@ -14,6 +14,7 @@ from .market_data import (
     build_market_data_summary,
     verify_yfinance_connection,
 )
+from .orchestration import analyze_ticker, save_stock_analysis
 from .strategies import run_momentum_trader, run_value_contrarian
 
 
@@ -132,6 +133,23 @@ def run_strategy_command(ticker: str, use_strategy_a: bool) -> int:
     return 0
 
 
+def run_analysis_command(ticker: str, save_output: bool) -> int:
+    """Run the full single-ticker pipeline and optionally save the JSON artifact."""
+
+    try:
+        result = analyze_ticker(ticker)
+        saved_path = save_stock_analysis(result) if save_output else None
+    except Exception as exc:
+        print(f"Analysis error: {exc}", file=sys.stderr)
+        return 1
+
+    _print_json(result.model_dump(mode="json"))
+    if saved_path is not None:
+        print(f"Saved output: {saved_path}", file=sys.stderr)
+
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the command-line parser."""
 
@@ -147,7 +165,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run the Value Contrarian on one ticker.",
     )
+    command_group.add_argument("--analyze", action="store_true", help="Run the full single-ticker analysis pipeline.")
     parser.add_argument("--ticker", default="AAPL", help="Ticker to use for the yfinance verification fetch.")
+    parser.add_argument(
+        "--save-output",
+        action="store_true",
+        help="Save single-ticker analysis JSON to outputs/{TICKER}.json.",
+    )
     return parser
 
 
@@ -156,6 +180,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.save_output and not args.analyze:
+        print("--save-output requires --analyze.", file=sys.stderr)
+        return 2
 
     if args.verify:
         return run_verification(args.ticker, include_groq=True)
@@ -169,6 +197,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_strategy_command(args.ticker, use_strategy_a=True)
     if args.strategy_b:
         return run_strategy_command(args.ticker, use_strategy_a=False)
+    if args.analyze:
+        return run_analysis_command(args.ticker, save_output=args.save_output)
 
     parser.print_help()
     return 0

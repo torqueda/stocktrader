@@ -4,7 +4,7 @@
 
 ## Current Scope
 
-Phase 1 through the evaluator phase are in place:
+Phase 1 through single-ticker orchestration are in place:
 - project scaffolding and shared contracts
 - environment verification for `yfinance` and Groq
 - a market-data component that builds compact JSON-ready context for later strategy agents
@@ -12,6 +12,7 @@ Phase 1 through the evaluator phase are in place:
 - single-strategy Groq calls that return validated JSON outputs
 - a reusable LLM wrapper that separates raw calls, JSON parsing, and validated structured output
 - evaluator prompt files and evaluator logic for agreement vs disagreement analysis
+- end-to-end one-ticker orchestration with optional JSON saving to `outputs/`
 
 Chosen strategies:
 - Momentum Trader
@@ -92,6 +93,27 @@ These commands:
 - call Groq for one strategy only
 - validate the returned JSON into the required strategy-output shape
 
+## Single-Ticker Analysis
+
+Run the full pipeline for one ticker:
+
+```bash
+.venv/bin/python -m src.main --analyze --ticker AAPL
+```
+
+Run the full pipeline and save the result to `outputs/AAPL.json`:
+
+```bash
+.venv/bin/python -m src.main --analyze --ticker AAPL --save-output
+```
+
+This command:
+- builds market data once
+- runs both strategies independently on the same market context
+- runs the evaluator after both strategies finish
+- prints the validated final JSON result
+- optionally writes a pretty-printed per-ticker artifact to `outputs/`
+
 ## Notes for Grading
 
-End-to-end orchestration and saved output artifacts are still upcoming. Later phases will add generated JSON outputs and report artifacts. Pre-generated outputs will be included so the project can be reviewed without requiring graders to provide API keys.
+Multi-ticker batch orchestration, `summary.json`, and report artifacts are still upcoming. Pre-generated outputs will be included so the project can be reviewed without requiring graders to provide API keys.
