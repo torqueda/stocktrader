@@ -1,0 +1,7 @@
+groq
+yfinance
+pandas
+numpy
+pydantic
+python-dotenv
+pytest
