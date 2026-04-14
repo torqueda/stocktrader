@@ -1,0 +1,34 @@
+{
+  "ticker": "PG",
+  "run_date": "2026-04-13",
+  "market_data_summary": {
+    "ticker": "PG",
+    "latest_trading_date": "2026-04-13",
+    "rows_fetched": 250,
+    "current_price": 143.58,
+    "pct_change_30d": -14.13,
+    "moving_avg_20d": 144.82,
+    "moving_avg_50d": 152.89,
+    "volume_trend_ratio": 0.941,
+    "distance_from_52w_high_pct": -16.35,
+    "distance_from_52w_low_pct": 4.33,
+    "recent_drawdown_pct": -14.13,
+    "rsi_14": 40.97
+  },
+  "strategy_a": {
+    "name": "Momentum Trader",
+    "decision": "HOLD",
+    "confidence": 6,
+    "justification": "The 20-day moving average is at 144.82, and the current price is 143.58, which is above the 20-day moving average but below the 50-day moving average at 152.89. The 30-day return is -14.13%, and the volume trend ratio is 0.941, indicating a slightly weakening trend. The recent price action has been mixed, with the price fluctuating between 141.3 and 146.66 over the last 5 days, and the volume has also been volatile."
+  },
+  "strategy_b": {
+    "name": "Value Contrarian",
+    "decision": "BUY",
+    "confidence": 8,
+    "justification": "The stock has fallen meaningfully from its 52-week high, with a distance of 16.35% below the peak. The recent drawdown of 14.13% also suggests a notable decline. The RSI of 40.97 indicates oversold conditions, suggesting that the downside may already be overdiscounted. Given these factors, a contrarian BUY signal is warranted."
+  },
+  "evaluator": {
+    "agents_agree": false,
+    "analysis": "The strategies diverged due to their differing priorities in evaluating the market data. Strategy A, the Momentum Trader, focused on the stock's recent price action and trend, noting that the current price is above the 20-day moving average but below the 50-day moving average, and that the volume trend ratio is slightly weakening. In contrast, Strategy B, the Value Contrarian, emphasized the stock's distance from its 52-week high and the recent drawdown, which it saw as indicative of oversold conditions. The Momentum Trader's focus on short-term trend and volatility led it to conclude that the stock should be held, while the Value Contrarian's emphasis on value and contrarian signals led it to recommend a BUY. The same market context can support different conclusions because the strategies prioritize different signals."
+  }
+}

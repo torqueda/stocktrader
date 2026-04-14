@@ -1,0 +1,40 @@
+{
+  "strategies": [
+    "Momentum Trader",
+    "Value Contrarian"
+  ],
+  "stocks_analyzed": [
+    "WMT",
+    "NVDA",
+    "UNH",
+    "PG"
+  ],
+  "total_agreements": 2,
+  "total_disagreements": 2,
+  "results": [
+    {
+      "ticker": "WMT",
+      "a_decision": "HOLD",
+      "b_decision": "BUY",
+      "agree": false
+    },
+    {
+      "ticker": "NVDA",
+      "a_decision": "BUY",
+      "b_decision": "BUY",
+      "agree": true
+    },
+    {
+      "ticker": "UNH",
+      "a_decision": "BUY",
+      "b_decision": "BUY",
+      "agree": true
+    },
+    {
+      "ticker": "PG",
+      "a_decision": "HOLD",
+      "b_decision": "BUY",
+      "agree": false
+    }
+  ]
+}

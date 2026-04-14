@@ -1,0 +1,34 @@
+{
+  "ticker": "UNH",
+  "run_date": "2026-04-13",
+  "market_data_summary": {
+    "ticker": "UNH",
+    "latest_trading_date": "2026-04-13",
+    "rows_fetched": 250,
+    "current_price": 313.0,
+    "pct_change_30d": 6.73,
+    "moving_avg_20d": 282.79,
+    "moving_avg_50d": 283.6,
+    "volume_trend_ratio": 0.978,
+    "distance_from_52w_high_pct": -47.45,
+    "distance_from_52w_low_pct": 33.42,
+    "recent_drawdown_pct": -12.14,
+    "rsi_14": 67.86
+  },
+  "strategy_a": {
+    "name": "Momentum Trader",
+    "decision": "BUY",
+    "confidence": 8,
+    "justification": "The price of UNH is above both the 20-day and 50-day moving averages, with a price relative to the 20-day moving average of 10.68% and 10.37% relative to the 50-day moving average. The 30-day return is 6.73%, and the volume trend ratio is 0.978, indicating a slight increase in volume. These indicators suggest a strong trend continuation and support a BUY decision."
+  },
+  "strategy_b": {
+    "name": "Value Contrarian",
+    "decision": "BUY",
+    "confidence": 8,
+    "justification": "The stock UNH has fallen significantly from its 52-week high, with a distance of -47.45% from the high and 33.42% from the low, indicating potential overextension. The recent drawdown of -12.14% also suggests a rebound setup. Furthermore, the RSI of 67.86 indicates oversold conditions, making a contrarian BUY call more compelling."
+  },
+  "evaluator": {
+    "agents_agree": true,
+    "analysis": "Both strategies converged on a BUY decision for UNH due to their shared recognition of a strong trend continuation and potential for a rebound setup. Strategy A, the Momentum Trader, identified UNH's price above both the 20-day and 50-day moving averages, with a 6.73% 30-day return and a slight increase in volume, indicating a strong trend continuation. Meanwhile, Strategy B, the Value Contrarian, noted UNH's significant fall from its 52-week high, recent drawdown, and oversold RSI of 67.86, suggesting a rebound setup. Although they approached the decision from different angles, both strategies converged on the same conclusion, highlighting the robustness of their reasoning."
+  }
+}
