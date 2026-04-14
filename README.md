@@ -4,7 +4,7 @@
 
 ## Current Scope
 
-Phase 1 through single-ticker orchestration are in place:
+Phase 1 through batch orchestration are in place:
 - project scaffolding and shared contracts
 - environment verification for `yfinance` and Groq
 - a market-data component that builds compact JSON-ready context for later strategy agents
@@ -13,6 +13,9 @@ Phase 1 through single-ticker orchestration are in place:
 - a reusable LLM wrapper that separates raw calls, JSON parsing, and validated structured output
 - evaluator prompt files and evaluator logic for agreement vs disagreement analysis
 - end-to-end one-ticker orchestration with optional JSON saving to `outputs/`
+- multi-ticker analysis with per-stock outputs plus `outputs/summary.json`
+- lightweight output review helpers for validating saved artifacts without rerunning models
+- a frozen graded four-stock set with a dedicated final-run command
 
 Chosen strategies:
 - Momentum Trader
@@ -114,6 +117,55 @@ This command:
 - prints the validated final JSON result
 - optionally writes a pretty-printed per-ticker artifact to `outputs/`
 
+## Batch Analysis
+
+Run a batch analysis and save per-stock outputs plus `summary.json`:
+
+```bash
+.venv/bin/python -m src.main --analyze-many --tickers AAPL,MSFT,NVDA,PFE
+```
+
+This command:
+- normalizes and deduplicates the ticker list while preserving order
+- reuses the single-ticker pipeline for each ticker
+- saves per-stock JSON files to `outputs/`
+- writes `outputs/summary.json`
+- prints the validated summary JSON to stdout
+
+## Graded Set Run
+
+The frozen graded stock set is:
+
+- `steady_large_cap`: `WMT`
+- `volatile_momentum`: `NVDA`
+- `recent_decliner`: `UNH`
+- `sideways`: `PG`
+
+Run the recommended final deliverable path:
+
+```bash
+.venv/bin/python -m src.main --analyze-graded-set
+```
+
+This command reuses the existing batch pipeline, saves all four per-stock outputs plus `outputs/summary.json`, and prints the validated summary JSON to stdout.
+
+## Reviewing Saved Outputs
+
+Review one saved per-ticker artifact:
+
+```bash
+.venv/bin/python -m src.main --review-output --ticker AAPL
+```
+
+Review the saved batch summary:
+
+```bash
+.venv/bin/python -m src.main --review-summary
+```
+
+These commands validate the saved JSON structure locally and print the artifact only if it passes schema and quality-control checks.
+
 ## Notes for Grading
 
-Multi-ticker batch orchestration, `summary.json`, and report artifacts are still upcoming. Pre-generated outputs will be included so the project can be reviewed without requiring graders to provide API keys.
+Report artifacts are still upcoming. Pre-generated outputs will be included so the project can be reviewed without requiring graders to provide API keys.
+For live Groq-backed runs, make sure `GROQ_API_KEY` is visible to the terminal or VS Code process that launches the CLI.

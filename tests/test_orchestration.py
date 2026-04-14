@@ -77,6 +77,13 @@ def make_analysis_output() -> StockAnalysisOutput:
             "rows_fetched": 250,
             "current_price": 259.2,
             "pct_change_30d": -1.89,
+            "moving_avg_20d": 253.74,
+            "moving_avg_50d": 260.9,
+            "volume_trend_ratio": 0.874,
+            "distance_from_52w_high_pct": -10.19,
+            "distance_from_52w_low_pct": 36.56,
+            "recent_drawdown_pct": -9.43,
+            "rsi_14": 53.64,
         },
         strategy_a=make_strategy_output("Momentum Trader", Decision.BUY),
         strategy_b=make_strategy_output("Value Contrarian", Decision.HOLD),
@@ -94,8 +101,16 @@ def test_analyze_ticker_runs_full_pipeline_once_and_in_order(
     shared_market_context = make_market_context()
     compact_summary = {
         "ticker": "AAPL",
+        "latest_trading_date": "2026-04-13",
+        "rows_fetched": 250,
         "current_price": 259.2,
         "pct_change_30d": -1.89,
+        "moving_avg_20d": 253.74,
+        "moving_avg_50d": 260.9,
+        "volume_trend_ratio": 0.874,
+        "distance_from_52w_high_pct": -10.19,
+        "distance_from_52w_low_pct": 36.56,
+        "recent_drawdown_pct": -9.43,
         "rsi_14": 53.64,
     }
 

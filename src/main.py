@@ -8,13 +8,23 @@ import sys
 from typing import Sequence
 
 from .config import get_groq_api_key
+from .final_run import get_graded_run_tickers
 from .llm_client import verify_groq_connection
 from .market_data import (
     build_market_context,
     build_market_data_summary,
     verify_yfinance_connection,
 )
-from .orchestration import analyze_ticker, save_stock_analysis
+from .orchestration import (
+    analyze_ticker,
+    analyze_tickers,
+    build_summary_output,
+    get_output_path_for_ticker,
+    load_stock_analysis,
+    load_summary_output,
+    save_stock_analysis,
+    save_summary_output,
+)
 from .strategies import run_momentum_trader, run_value_contrarian
 
 
@@ -22,6 +32,19 @@ def _print_json(payload: object) -> None:
     """Print a JSON payload with indentation."""
 
     print(json.dumps(payload, indent=2))
+
+
+def _format_runtime_error(command_name: str, exc: Exception) -> str:
+    """Return a clearer runtime error message for live commands."""
+
+    message = str(exc)
+    if "GROQ_API_KEY is not configured" in message:
+        return (
+            f"{command_name} error: {message} "
+            "Ensure GROQ_API_KEY is visible to the terminal or VS Code process running this command."
+        )
+
+    return f"{command_name} error: {message}"
 
 
 def check_groq_configuration() -> bool:
@@ -94,7 +117,7 @@ def run_groq_verification_only() -> int:
     try:
         payload = verify_groq_connection()
     except Exception as exc:  # pragma: no cover - exercised manually
-        print(f"Groq verification failed: {exc}", file=sys.stderr)
+        print(_format_runtime_error("Groq verification", exc), file=sys.stderr)
         return 1
 
     _print_json(payload)
@@ -126,7 +149,7 @@ def run_strategy_command(ticker: str, use_strategy_a: bool) -> int:
             else run_value_contrarian(ticker, market_context)
         )
     except Exception as exc:
-        print(f"Strategy error: {exc}", file=sys.stderr)
+        print(_format_runtime_error("Strategy", exc), file=sys.stderr)
         return 1
 
     _print_json(result.model_dump(mode="json"))
@@ -140,13 +163,84 @@ def run_analysis_command(ticker: str, save_output: bool) -> int:
         result = analyze_ticker(ticker)
         saved_path = save_stock_analysis(result) if save_output else None
     except Exception as exc:
-        print(f"Analysis error: {exc}", file=sys.stderr)
+        print(_format_runtime_error("Analysis", exc), file=sys.stderr)
         return 1
 
     _print_json(result.model_dump(mode="json"))
     if saved_path is not None:
         print(f"Saved output: {saved_path}", file=sys.stderr)
 
+    return 0
+
+
+def _parse_batch_tickers(raw_tickers: str | None) -> list[str]:
+    """Parse a comma-separated ticker list for batch analysis."""
+
+    if raw_tickers is None:
+        return []
+
+    return [ticker.strip() for ticker in raw_tickers.split(",") if ticker.strip()]
+
+
+def _run_batch_analysis_with_tickers(tickers: list[str]) -> int:
+    """Run the full batch pipeline for an explicit ticker list."""
+
+    try:
+        results = analyze_tickers(tickers, save_outputs=True)
+        summary = build_summary_output(results)
+        summary_path = save_summary_output(summary)
+    except Exception as exc:
+        print(_format_runtime_error("Batch analysis", exc), file=sys.stderr)
+        return 1
+
+    _print_json(summary.model_dump(mode="json"))
+    for result in results:
+        print(f"Saved output: {get_output_path_for_ticker(result.ticker)}", file=sys.stderr)
+    print(f"Saved summary: {summary_path}", file=sys.stderr)
+
+    return 0
+
+
+def run_batch_analysis_command(raw_tickers: str | None) -> int:
+    """Run the full batch pipeline, save artifacts, and print summary JSON."""
+
+    tickers = _parse_batch_tickers(raw_tickers)
+    if not tickers:
+        print("--analyze-many requires --tickers with at least one ticker.", file=sys.stderr)
+        return 2
+
+    return _run_batch_analysis_with_tickers(tickers)
+
+
+def run_graded_set_analysis_command() -> int:
+    """Run the full batch pipeline for the frozen graded stock set."""
+
+    return _run_batch_analysis_with_tickers(get_graded_run_tickers())
+
+
+def run_review_output_command(ticker: str) -> int:
+    """Load and print one saved per-ticker output artifact."""
+
+    try:
+        output = load_stock_analysis(ticker)
+    except Exception as exc:
+        print(f"Review error: {exc}", file=sys.stderr)
+        return 1
+
+    _print_json(output.model_dump(mode="json"))
+    return 0
+
+
+def run_review_summary_command() -> int:
+    """Load and print the saved summary artifact."""
+
+    try:
+        summary = load_summary_output()
+    except Exception as exc:
+        print(f"Review error: {exc}", file=sys.stderr)
+        return 1
+
+    _print_json(summary.model_dump(mode="json"))
     return 0
 
 
@@ -166,7 +260,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the Value Contrarian on one ticker.",
     )
     command_group.add_argument("--analyze", action="store_true", help="Run the full single-ticker analysis pipeline.")
+    command_group.add_argument("--analyze-many", action="store_true", help="Run the full batch analysis pipeline.")
+    command_group.add_argument(
+        "--analyze-graded-set",
+        action="store_true",
+        help="Run the full batch analysis pipeline for the frozen graded stock set.",
+    )
+    command_group.add_argument(
+        "--review-output",
+        action="store_true",
+        help="Load and validate one saved per-ticker output artifact.",
+    )
+    command_group.add_argument(
+        "--review-summary",
+        action="store_true",
+        help="Load and validate the saved summary.json artifact.",
+    )
     parser.add_argument("--ticker", default="AAPL", help="Ticker to use for the yfinance verification fetch.")
+    parser.add_argument(
+        "--tickers",
+        help="Comma-separated tickers for batch analysis, for example AAPL,MSFT,NVDA,PFE.",
+    )
     parser.add_argument(
         "--save-output",
         action="store_true",
@@ -182,7 +296,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.save_output and not args.analyze:
-        print("--save-output requires --analyze.", file=sys.stderr)
+        print(
+            "--save-output is only supported with --analyze. Batch and graded-set analysis already save outputs by default.",
+            file=sys.stderr,
+        )
         return 2
 
     if args.verify:
@@ -199,6 +316,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_strategy_command(args.ticker, use_strategy_a=False)
     if args.analyze:
         return run_analysis_command(args.ticker, save_output=args.save_output)
+    if args.analyze_many:
+        return run_batch_analysis_command(args.tickers)
+    if args.analyze_graded_set:
+        return run_graded_set_analysis_command()
+    if args.review_output:
+        return run_review_output_command(args.ticker)
+    if args.review_summary:
+        return run_review_summary_command()
 
     parser.print_help()
     return 0
