@@ -18,6 +18,7 @@ At a high level, the program:
 - sends the same market context to two strategy agents independently
 - validates each strategy result as structured JSON
 - runs an evaluator after both strategies finish
+- can optionally run a second-round Debate Mode from a saved disagreement artifact
 - saves per-stock results and a batch summary for later review
 
 This repository is designed for an academic assignment and reproducible grading, not for live trading.
@@ -47,8 +48,9 @@ The analysis pipeline is:
 2. `strategy_a`: run `Momentum Trader` on the shared market context.
 3. `strategy_b`: run `Value Contrarian` on the same shared market context.
 4. `evaluator`: compare the two validated strategy outputs after both strategies are complete.
-5. `per-stock output`: save a `StockAnalysisOutput` JSON artifact for each analyzed ticker.
-6. `batch summary`: save `outputs/summary.json` with aggregate agreement and disagreement counts.
+5. `debate mode` (optional): load a saved disagreement artifact, let both strategies answer each other in a second round, and save a separate debate artifact.
+6. `per-stock output`: save a `StockAnalysisOutput` JSON artifact for each analyzed ticker.
+7. `batch summary`: save `outputs/summary.json` with aggregate agreement and disagreement counts.
 
 Both strategy agents receive the same market context independently before evaluation. Neither strategy sees the other strategy's output before the evaluator step.
 
@@ -56,6 +58,7 @@ Both strategy agents receive the same market context independently before evalua
 
 - `src/`: core application code for configuration, market data, strategies, evaluator, orchestration, CLI, and the frozen graded stock set
 - `prompts/`: reusable prompt templates for the two strategies and evaluator branches
+- `prompts/`: also includes Debate Mode prompts for the two second-round strategy responses
 - `outputs/`: generated per-stock JSON files and `summary.json`
 - `report/`: short write-up artifacts and notes for final deliverables
 - `tests/`: mocked and deterministic test coverage for schemas, market data, strategies, evaluator, orchestration, QC, and final-run helpers
@@ -190,6 +193,33 @@ Review the saved batch summary:
 
 Successful analysis commands print machine-readable JSON to stdout. Operational messages such as saved file paths and runtime failures are printed separately.
 
+## Debate Mode
+
+Debate Mode is an optional bonus feature for disagreement cases only.
+
+It is designed to continue from an existing saved first-pass artifact rather than rerun the whole pipeline. That means it:
+
+- loads `outputs/{TICKER}.json`
+- reuses the saved `market_data_summary`, `strategy_a`, `strategy_b`, and `evaluator`
+- sends each strategy a second-round debate prompt so it can respond to the other strategy's reasoning
+- saves a separate debate artifact with an added top-level `debate` field
+
+The original first-pass output file stays untouched.
+
+Run Debate Mode for one saved disagreement case:
+
+```bash
+.venv/bin/python -m src.main --debate-output --ticker WMT
+```
+
+Review a saved debate artifact:
+
+```bash
+.venv/bin/python -m src.main --review-debate --ticker WMT
+```
+
+Use `--review-summary` first if you want to identify which saved tickers currently disagree before running debate.
+
 ## Frozen Graded Stock Set
 
 The final frozen graded set is:
@@ -229,6 +259,10 @@ Batch runs also write:
 
 - `outputs/summary.json`
 
+Debate Mode writes separate continuation artifacts such as:
+
+- `outputs/WMT.debate.json`
+
 The summary follows the `SummaryOutput` shape and includes:
 
 - `strategies`
@@ -238,6 +272,15 @@ The summary follows the `SummaryOutput` shape and includes:
 - `results`
 
 The review commands validate these saved artifacts against the current schemas and quality-control checks before printing them. That makes them useful as a final sanity check before submission.
+
+Debate artifacts include the original saved output plus a `debate` field containing:
+
+- `strategy_a_response`
+- `strategy_b_response`
+- `strategy_a_change`
+- `strategy_b_change`
+
+Those change blocks show whether each agent changed its decision, confidence, or both after responding to the opposing argument.
 
 For grading and public review, the repository is intended to include pre-generated output artifacts so reviewers do not need to rerun live Groq calls.
 
@@ -278,6 +321,10 @@ The market-data layer requires enough daily history to compute the moving averag
 
 The strategy and evaluator layers validate JSON structure locally. If the model returns malformed JSON or invalid fields, the program retries once and then fails with a clear validation error instead of saving a weak artifact.
 
+### Debate Mode refuses to run
+
+Debate Mode only applies to saved disagreement cases. If the evaluator already marked a ticker as agreement, the debate command will fail clearly instead of creating a debate artifact.
+
 ### Why review commands are useful
 
 Use the review commands before submission to confirm that:
@@ -285,6 +332,7 @@ Use the review commands before submission to confirm that:
 - the saved JSON files exist
 - the schema is still valid
 - the per-stock outputs and batch summary remain consistent with the current QC rules
+- any saved debate artifacts are internally consistent with the original first-pass output
 
 ## Testing
 

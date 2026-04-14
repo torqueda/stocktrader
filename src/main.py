@@ -19,9 +19,12 @@ from .orchestration import (
     analyze_ticker,
     analyze_tickers,
     build_summary_output,
+    generate_debate_for_saved_output,
     get_output_path_for_ticker,
+    load_debate_stock_analysis,
     load_stock_analysis,
     load_summary_output,
+    save_debate_stock_analysis,
     save_stock_analysis,
     save_summary_output,
 )
@@ -218,11 +221,39 @@ def run_graded_set_analysis_command() -> int:
     return _run_batch_analysis_with_tickers(get_graded_run_tickers())
 
 
+def run_debate_output_command(ticker: str) -> int:
+    """Load an existing disagreement artifact, run debate mode, and save a separate debate JSON."""
+
+    try:
+        debated_output = generate_debate_for_saved_output(ticker)
+        saved_path = save_debate_stock_analysis(debated_output)
+    except Exception as exc:
+        print(_format_runtime_error("Debate", exc), file=sys.stderr)
+        return 1
+
+    _print_json(debated_output.model_dump(mode="json"))
+    print(f"Saved debate output: {saved_path}", file=sys.stderr)
+    return 0
+
+
 def run_review_output_command(ticker: str) -> int:
     """Load and print one saved per-ticker output artifact."""
 
     try:
         output = load_stock_analysis(ticker)
+    except Exception as exc:
+        print(f"Review error: {exc}", file=sys.stderr)
+        return 1
+
+    _print_json(output.model_dump(mode="json"))
+    return 0
+
+
+def run_review_debate_command(ticker: str) -> int:
+    """Load and print one saved debate artifact."""
+
+    try:
+        output = load_debate_stock_analysis(ticker)
     except Exception as exc:
         print(f"Review error: {exc}", file=sys.stderr)
         return 1
@@ -267,9 +298,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the full batch analysis pipeline for the frozen graded stock set.",
     )
     command_group.add_argument(
+        "--debate-output",
+        action="store_true",
+        help="Continue from an existing saved disagreement artifact and write a separate debate JSON.",
+    )
+    command_group.add_argument(
         "--review-output",
         action="store_true",
         help="Load and validate one saved per-ticker output artifact.",
+    )
+    command_group.add_argument(
+        "--review-debate",
+        action="store_true",
+        help="Load and validate one saved debate artifact.",
     )
     command_group.add_argument(
         "--review-summary",
@@ -320,8 +361,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return run_batch_analysis_command(args.tickers)
     if args.analyze_graded_set:
         return run_graded_set_analysis_command()
+    if args.debate_output:
+        return run_debate_output_command(args.ticker)
     if args.review_output:
         return run_review_output_command(args.ticker)
+    if args.review_debate:
+        return run_review_debate_command(args.ticker)
     if args.review_summary:
         return run_review_summary_command()
 

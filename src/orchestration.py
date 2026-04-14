@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import Any
 
 from .config import get_output_dir
+from .debate import run_debate_round
 from .evaluator import evaluate_strategies
 from .market_data import build_market_context, build_market_data_summary, normalize_ticker_symbol
-from .schemas import StockAnalysisOutput, SummaryOutput, SummaryRow
+from .schemas import DebateChange, DebateOutput, StockAnalysisOutput, SummaryOutput, SummaryRow
 from .strategies import (
     MOMENTUM_TRADER,
     VALUE_CONTRARIAN,
@@ -57,6 +58,9 @@ def get_output_path_for_ticker(ticker: str) -> Path:
 def save_stock_analysis(output: StockAnalysisOutput) -> Path:
     """Write one analyzed ticker result to a pretty-printed JSON file."""
 
+    if output.debate is not None:
+        raise ValueError("Use save_debate_stock_analysis() for artifacts that include a debate field.")
+
     validated_output = validate_stock_analysis_output(output)
     output_path = get_output_path_for_ticker(validated_output.ticker)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -69,6 +73,13 @@ def get_summary_output_path() -> Path:
     """Return the output JSON path for the batch summary."""
 
     return get_output_dir() / "summary.json"
+
+
+def get_debate_output_path_for_ticker(ticker: str) -> Path:
+    """Return the debate artifact JSON path for one ticker."""
+
+    symbol = normalize_ticker_symbol(ticker)
+    return get_output_dir() / f"{symbol}.debate.json"
 
 
 def _load_json_file(path: Path) -> Any:
@@ -115,6 +126,78 @@ def _validate_market_data_summary(summary: dict[str, object], ticker: str) -> No
         )
 
 
+def _validate_debate_change(
+    change: DebateChange,
+    before_name: str,
+    before_decision: object,
+    before_confidence: int,
+    before_justification: str,
+    after_decision: object,
+    after_confidence: int,
+    after_justification: str,
+) -> None:
+    """Validate one structured change block in debate output."""
+
+    if change.decision_before != before_decision or change.decision_after != after_decision:
+        raise ValueError(f"Debate change block for {before_name} has inconsistent decision values.")
+    if change.confidence_before != before_confidence or change.confidence_after != after_confidence:
+        raise ValueError(f"Debate change block for {before_name} has inconsistent confidence values.")
+
+    expected_decision_changed = before_decision != after_decision
+    expected_confidence_changed = before_confidence != after_confidence
+    expected_justification_changed = before_justification != after_justification
+    expected_position_changed = expected_decision_changed or expected_confidence_changed
+
+    if change.decision_changed != expected_decision_changed:
+        raise ValueError(f"Debate change block for {before_name} has an inconsistent decision_changed flag.")
+    if change.confidence_changed != expected_confidence_changed:
+        raise ValueError(f"Debate change block for {before_name} has an inconsistent confidence_changed flag.")
+    if change.justification_changed != expected_justification_changed:
+        raise ValueError(
+            f"Debate change block for {before_name} has an inconsistent justification_changed flag."
+        )
+    if change.position_changed != expected_position_changed:
+        raise ValueError(f"Debate change block for {before_name} has an inconsistent position_changed flag.")
+
+
+def _validate_debate_output(output: StockAnalysisOutput, debate: DebateOutput) -> None:
+    """Validate the debate field against the original first-round output."""
+
+    if output.evaluator.agents_agree:
+        raise ValueError("Debate output may only be attached to a saved disagreement artifact.")
+
+    if debate.strategy_a_response.name != MOMENTUM_TRADER:
+        raise ValueError(
+            f"debate.strategy_a_response.name must be '{MOMENTUM_TRADER}', received '{debate.strategy_a_response.name}'."
+        )
+    if debate.strategy_b_response.name != VALUE_CONTRARIAN:
+        raise ValueError(
+            "debate.strategy_b_response.name must be "
+            f"'{VALUE_CONTRARIAN}', received '{debate.strategy_b_response.name}'."
+        )
+
+    _validate_debate_change(
+        change=debate.strategy_a_change,
+        before_name=MOMENTUM_TRADER,
+        before_decision=output.strategy_a.decision,
+        before_confidence=output.strategy_a.confidence,
+        before_justification=output.strategy_a.justification,
+        after_decision=debate.strategy_a_response.decision,
+        after_confidence=debate.strategy_a_response.confidence,
+        after_justification=debate.strategy_a_response.justification,
+    )
+    _validate_debate_change(
+        change=debate.strategy_b_change,
+        before_name=VALUE_CONTRARIAN,
+        before_decision=output.strategy_b.decision,
+        before_confidence=output.strategy_b.confidence,
+        before_justification=output.strategy_b.justification,
+        after_decision=debate.strategy_b_response.decision,
+        after_confidence=debate.strategy_b_response.confidence,
+        after_justification=debate.strategy_b_response.justification,
+    )
+
+
 def validate_stock_analysis_output(output: StockAnalysisOutput) -> StockAnalysisOutput:
     """Run lightweight sanity checks on the final per-ticker analysis output."""
 
@@ -146,6 +229,8 @@ def validate_stock_analysis_output(output: StockAnalysisOutput) -> StockAnalysis
         )
 
     _validate_market_data_summary(output.market_data_summary, normalized_ticker)
+    if output.debate is not None:
+        _validate_debate_output(output, output.debate)
 
     return output.model_copy(
         update={
@@ -195,6 +280,45 @@ def load_stock_analysis(ticker: str) -> StockAnalysisOutput:
         raise ValueError(f"Saved stock analysis artifact is invalid for ticker '{ticker}'.") from exc
 
     return validate_stock_analysis_output(analysis_output)
+
+
+def load_debate_stock_analysis(ticker: str) -> StockAnalysisOutput:
+    """Load and validate one saved debate artifact."""
+
+    payload = _load_json_file(get_debate_output_path_for_ticker(ticker))
+    try:
+        analysis_output = StockAnalysisOutput.model_validate(payload)
+    except Exception as exc:
+        raise ValueError(f"Saved debate artifact is invalid for ticker '{ticker}'.") from exc
+
+    validated_output = validate_stock_analysis_output(analysis_output)
+    if validated_output.debate is None:
+        raise ValueError(f"Saved debate artifact for ticker '{ticker}' does not contain a debate field.")
+
+    return validated_output
+
+
+def save_debate_stock_analysis(output: StockAnalysisOutput) -> Path:
+    """Write a debate-extended artifact without overwriting the original first-pass output."""
+
+    validated_output = validate_stock_analysis_output(output)
+    if validated_output.debate is None:
+        raise ValueError("Debate artifacts must include a populated debate field.")
+
+    output_path = get_debate_output_path_for_ticker(validated_output.ticker)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    serialized_output = json.dumps(validated_output.model_dump(mode="json"), indent=2)
+    output_path.write_text(f"{serialized_output}\n", encoding="utf-8")
+    return output_path
+
+
+def generate_debate_for_saved_output(ticker: str) -> StockAnalysisOutput:
+    """Load one saved disagreement artifact, run debate mode, and attach the debate field."""
+
+    original_output = load_stock_analysis(ticker)
+    debate_output = run_debate_round(original_output)
+    debated_output = original_output.model_copy(update={"debate": debate_output})
+    return validate_stock_analysis_output(debated_output)
 
 
 def load_summary_output() -> SummaryOutput:

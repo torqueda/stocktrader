@@ -73,6 +73,28 @@ class EvaluatorOutput(BaseModel):
     analysis: str = Field(..., min_length=1)
 
 
+class DebateChange(BaseModel):
+    """Structured comparison between first-round and debate-round positions."""
+
+    decision_before: Decision
+    decision_after: Decision
+    confidence_before: int = Field(..., ge=1, le=10)
+    confidence_after: int = Field(..., ge=1, le=10)
+    decision_changed: bool
+    confidence_changed: bool
+    justification_changed: bool
+    position_changed: bool
+
+
+class DebateOutput(BaseModel):
+    """Structured second-round debate output for both strategies."""
+
+    strategy_a_response: StrategyOutput
+    strategy_b_response: StrategyOutput
+    strategy_a_change: DebateChange
+    strategy_b_change: DebateChange
+
+
 class StockAnalysisOutput(BaseModel):
     """Full per-stock analysis record."""
 
@@ -82,6 +104,7 @@ class StockAnalysisOutput(BaseModel):
     strategy_a: StrategyOutput
     strategy_b: StrategyOutput
     evaluator: EvaluatorOutput
+    debate: DebateOutput | None = None
 
 
 class SummaryRow(BaseModel):
